@@ -36,7 +36,7 @@ static inline uint8_t heuristic(uint16_t p, uint16_t o)
     return hp > ho ? hp : ho;
 }
 
-static int ida(uint16_t p0, uint16_t o0, uint8_t path[MAX_DEPTH])
+static int ida(uint16_t p0, uint16_t o0, uint8_t path_face[MAX_DEPTH], uint8_t path_turn[MAX_DEPTH])
 {
     uint16_t sp[MAX_DEPTH + 1], so[MAX_DEPTH + 1];
     uint16_t tp[MAX_DEPTH + 1], to[MAX_DEPTH + 1];
@@ -66,7 +66,7 @@ static int ida(uint16_t p0, uint16_t o0, uint8_t path[MAX_DEPTH])
             }
 
             /* Same-face pruning: never turn the face the parent just turned. */
-            if (d > 0 && face[d] == path[d - 1] / 3) {
+            if (d > 0 && face[d] == path_face[d - 1] ) {
                 ++face[d];
                 turn [d] = 0;
                 continue;
@@ -75,11 +75,14 @@ static int ida(uint16_t p0, uint16_t o0, uint8_t path[MAX_DEPTH])
                 tp[d] = sp[d];
                 to[d] = so[d];
             }
-            tp[d] = perm_trans[face[d]][tp[d]];
-            to[d] = orient_trans[face[d]][to[d]];
+
+            uint8_t selected_face = face[d];
+            uint8_t selected_turn = turn[d];
+
+            tp[d] = perm_trans[selected_face][tp[d]];
+            to[d] = orient_trans[selected_face][to[d]];
             ++generated;
 
-            uint8_t m = (uint8_t)(face[d] * 3 + turn[d]);
             uint8_t h = heuristic(tp[d], to[d]);
 
             ++turn[d];
@@ -90,7 +93,10 @@ static int ida(uint16_t p0, uint16_t o0, uint8_t path[MAX_DEPTH])
             }
             if (d + 1 + h > bound)
                 continue;
-            path[d] = m;
+
+            path_face[d] = selected_face;
+            path_turn[d] = selected_turn;
+
             if (h == 0) /* h == 0 only at the solved state */
                 return d + 1;
             ++d;
@@ -154,12 +160,12 @@ static void rank_pair(const state_t *state, uint16_t *pr, uint16_t *or)
 
 /* ---- Verification over every state ---- */
 
-/* Apply a move sequence with the transition tables; return 1 if solved. */
-static int solves(uint16_t p, uint16_t o, const uint8_t *path, int len)
+static int solves(uint16_t p, uint16_t o, const uint8_t *path_face,
+                  const uint8_t *path_turn, int len)
 {
     for (int i = 0; i < len; ++i) {
-        uint8_t face = path[i] / 3;
-        for (int t = 0; t <= path[i] % 3; ++t) {
+        uint8_t face = path_face[i];
+        for (int t = 0; t <= path_turn[i]; ++t) {
             p = perm_trans[face][p];
             o = orient_trans[face][o];
         }
@@ -203,7 +209,8 @@ static int run_all(int only_hardest)
     uint64_t sum_exp[MAX_DEPTH + 1] = {0};
     uint32_t worst_gen[MAX_DEPTH + 1] = {0};
     uint32_t count[MAX_DEPTH + 1] = {0}, failures = 0;
-    uint8_t path[MAX_DEPTH];
+    uint8_t path_face[MAX_DEPTH], path_turn[MAX_DEPTH];
+
 
     for (uint32_t s = 0; s < STATES; ++s) {
         uint16_t p = (uint16_t) (s / ORIENTATIONS);
@@ -211,8 +218,8 @@ static int run_all(int only_hardest)
         uint8_t d = dist[s];
         if (only_hardest && d != MAX_DEPTH)
             continue;
-        int len = ida(p, o, path);
-        if (len != d || !solves(p, o, path, len)) {
+        int len = ida(p, o, path_face, path_turn);
+        if (len != d || !solves(p, o, path_face, path_turn, len)) {
             if (failures < 10)
                 printf("FAIL: state %u, ida length %d, true distance %u\n",
                        s, len, d);
@@ -265,15 +272,15 @@ int main(int argc, char **argv)
     }
 
     uint16_t p, o;
-    uint8_t path[MAX_DEPTH];
+    uint8_t path_face[MAX_DEPTH], path_turn[MAX_DEPTH];
     rank_pair(&state, &p, &o);
-    int len = ida(p, o, path);
+    int len = ida(p, o, path_face, path_turn);
     if (len < 0) {
         fputs("no solution found\n", stderr);
         return 1;
     }
     for (int i = 0; i < len; ++i)
-        printf("%s%s", i ? " " : "", move_names[path[i]]);
+        printf("%s%s", i ? " " : "", move_names[path_face[i] * 3 + path_turn[i]]);
     putchar('\n');
     if (verbose)
         fprintf(stderr, "length %d, h(root) %u, expanded %u, generated %u\n",
