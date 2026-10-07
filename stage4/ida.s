@@ -1807,6 +1807,25 @@ orient_dist:
     .byte 5, 5, 6, 5, 4, 5, 6, 5, 4, 5, 3, 5, 5, 4, 3, 4
     .byte 4, 4, 5, 4, 4, 5, 4, 5, 6, 5, 4, 5, 5, 4, 4, 5
     .byte 5, 5, 4, 5, 4, 5, 3, 5, 5
+
+
+mv_R:   .string "R"
+mv_R2:  .string "R2"
+mv_Rp:  .string "R'"
+mv_B:   .string "B"
+mv_B2:  .string "B2"
+mv_Bp:  .string "B'"
+mv_D:   .string "D"
+mv_D2:  .string "D2"
+mv_Dp:  .string "D'"
+
+    .align 2
+move_name:
+    .word mv_R, mv_R2, mv_Rp
+    .word mv_B, mv_B2, mv_Bp
+    .word mv_D, mv_D2, mv_Dp
+
+
     .text
 main:
     la s1, perm_trans
@@ -1814,22 +1833,36 @@ main:
     la s3, orient_trans
     la s4, orient_dist
 
+    la s5, move_name
+    lw a0, 4(s5)
+
+    li a7, 4
+    ecall
+
+
+    li a1, 0
+    li a2, 1
+
+    jal ra, heuristic 
+
+   
+    li a7, 1
+    ecall
+
+
+    li a7, 10
+    ecall 
+
 heuristic:
-    li a1, 720
-    li a2, 0
     add t2, s2, a1
     add t3, s4, a2
     lbu t0, 0(t2)
     lbu t1, 0(t3)
     bltu t0, t1, ho
     mv a0, t0
-    j p
+    ret
 ho: 
     mv a0, t1
-p:
-    li a7, 1
-    ecall
+    ret
 
-    li a7, 10
-    ecall 
 
