@@ -1809,20 +1809,24 @@ orient_dist:
     .byte 5, 5, 4, 5, 4, 5, 3, 5, 5
     .text
 main:
-    la t0, perm_trans
-    la t1, perm_dist
-    la t2, orient_trans
-    la t3, orient_dist
-    lhu t4, 0(t0)
-    lbu t5, 720(t1)
-    mv a0, t4   
-    li a7, 1
-    ecall
-    li a0, 10
-    li a7, 11
-    ecall
+    la s1, perm_trans
+    la s2, perm_dist
+    la s3, orient_trans
+    la s4, orient_dist
 
-    mv a0, t5
+heuristic:
+    li a1, 720
+    li a2, 0
+    add t2, s2, a1
+    add t3, s4, a2
+    lbu t0, 0(t2)
+    lbu t1, 0(t3)
+    bltu t0, t1, ho
+    mv a0, t0
+    j p
+ho: 
+    mv a0, t1
+p:
     li a7, 1
     ecall
 
