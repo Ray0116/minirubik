@@ -1808,6 +1808,16 @@ orient_dist:
     .byte 4, 4, 5, 4, 4, 5, 4, 5, 6, 5, 4, 5, 5, 4, 4, 5
     .byte 5, 5, 4, 5, 4, 5, 3, 5, 5
 
+    .align 1
+st_p:       .half 0,0,0,0,0,0,0,0,0,0,0,0
+st_o:       .half 0,0,0,0,0,0,0,0,0,0,0,0
+tp:         .half 0,0,0,0,0,0,0,0,0,0,0,0
+to:         .half 0,0,0,0,0,0,0,0,0,0,0,0
+face:       .byte 0,0,0,0,0,0,0,0,0,0,0,0
+turn:       .byte 0,0,0,0,0,0,0,0,0,0,0,0
+path_face:  .byte 0,0,0,0,0,0,0,0,0,0,0,0
+path_turn:  .byte 0,0,0,0,0,0,0,0,0,0,0,0
+
 
 mv_R:   .string "R"
 mv_R2:  .string "R2"
@@ -1824,6 +1834,10 @@ move_name:
     .word mv_R, mv_R2, mv_Rp
     .word mv_B, mv_B2, mv_Bp
     .word mv_D, mv_D2, mv_Dp
+
+
+
+
 
 #s1 perm_trans R face
 #s2 perm_dist
@@ -1856,39 +1870,198 @@ main:
     li t0, 2916
     add s10, s3, t0
 
-    lhu a0, 0(s9)
-    li a7, 1
+    li   a1, 720          # p0
+    li   a2, 0            # o0
+    jal  ra, ida
+
+    li   a7, 1            
     ecall
 
-    li a0, 10
-    li a7, 11 
+    li   a0, 10           
+    li   a7, 11
     ecall
 
-    la s5, move_name
-    lw a0, 4(s5)
-
-    li a7, 4
+    li   a7, 10           
     ecall
 
-    li a0, 10
-    li a7, 11 
-    ecall
+ida:
+    addi sp, sp, -16
+    sw   ra, 12(sp)
+    sw   s0, 8(sp)
+    sw   s6, 4(sp)
+    sw   s11, 0(sp)
 
-    li a1, 0
-    li a2, 1
+    or   t0, a1, a2
+    bnez t0, init
+    li   a0, 0
+    j    done
 
-    jal ra, heuristic 
+init:
+    mv   s11, a1            
+    la   t0, st_o
+    sh   a2, 0(t0)          
 
-   
-    li a7, 1
-    ecall
+    jal  ra, heuristic      
+    mv   s0, a0            
 
-    li a0, 10
-    li a7, 11 
-    ecall
+bound:
+    li   t0, 11
+    bgt  s0, t0, fail   
+    li   s6, 0              
+    la   t0, st_p
+    sh   s11, 0(t0)        
+                           
+    la   t0, face
+    sb   zero, 0(t0)        
+    la   t0, turn
+    sb   zero, 0(t0)      
 
-    li a7, 10
-    ecall 
+loop:
+    bltz s6, next_bound     
+
+    la   t0, face
+    add  t0, t0, s6             
+    lbu  t1, 0(t0)             
+    li   t2, 3
+    blt  t1, t2, prune      
+    addi s6, s6, -1             
+    j    loop
+
+prune:                     
+    beqz s6, cur            
+    la   t2, path_face
+    add  t2, t2, s6
+    lbu  t2, -1(t2)             
+    bne  t1, t2, cur
+    addi t1, t1, 1
+    sb   t1, 0(t0)              
+    la   t2, turn
+    add  t2, t2, s6
+    sb   zero, 0(t2)         
+    j    loop
+
+cur:
+    la   t2, turn
+    add  t2, t2, s6            
+    lbu  t3, 0(t2)              
+    slli t4, s6, 1              
+    la   t5, tp
+    add  t5, t5, t4             # t5 = tp[d]
+    la   t6, to
+    add  t6, t6, t4             # t6 = to[d]
+    bnez t3, pick           # turn[d] != 0
+    la   a3, st_p
+    add  a3, a3, t4
+    lhu  a3, 0(a3)
+    sh   a3, 0(t5)              # tp[d] = st_p[d]
+    la   a3, st_o
+    add  a3, a3, t4
+    lhu  a3, 0(a3)
+    sh   a3, 0(t6)              # to[d] = st_o[d]
+
+pick:                       
+    mv   a4, s1                 # face 0：R
+    mv   a5, s3
+    beqz t1, trans
+    mv   a4, s7                 # face 1：B
+    mv   a5, s8
+    li   a3, 1
+    beq  t1, a3, trans
+    mv   a4, s9                 # face 2：D
+    mv   a5, s10
+
+trans:
+    lhu  a1, 0(t5)
+    slli a1, a1, 1
+    add  a1, a4, a1
+    lhu  a1, 0(a1)              # a1 = perm_trans[f][tp[d]]
+    sh   a1, 0(t5)              # tp[d] = a1
+    lhu  a2, 0(t6)
+    slli a2, a2, 1
+    add  a2, a5, a2
+    lhu  a2, 0(a2)              # a2 = orient_trans[f][to[d]]
+    sh   a2, 0(t6)              # to[d] = a2
+
+    mv   t4, t1                 # t4 = selected_face
+    mv   t5, t3                 # t5 = selected_turn
+
+    # a1 = tp[d]，a2 = to[d]
+    slli t0, s6, 1              # t0 = 2d
+    la   t1, tp
+    add  t1, t1, t0
+    lhu  a1, 0(t1)              # a1 = tp[d]
+    la   t1, to
+    add  t1, t1, t0
+    lhu  a2, 0(t1)              # a2 = to[d]
+    jal  ra, heuristic          # a0 = h
+
+    la   t0, turn
+    add  t0, t0, s6             # t0 = turn[d]
+    addi t1, t5, 1              # selected_turn + 1
+    li   t2, 3
+    bne  t1, t2, turn_store
+    sb   zero, 0(t0)            # turn[d] = 0
+    la   t0, face
+    add  t0, t0, s6
+    addi t1, t4, 1
+    sb   t1, 0(t0)              # face[d]++
+    j    turn_done
+turn_store:
+    sb   t1, 0(t0)              # turn[d]++
+turn_done:
+
+    addi t0, s6, 1
+    add  t0, t0, a0
+    bgt  t0, s0, loop
+
+    la   t0, path_face
+    add  t0, t0, s6
+    sb   t4, 0(t0)
+    la   t0, path_turn
+    add  t0, t0, s6
+    sb   t5, 0(t0)
+
+    bnez a0, push
+    addi a0, s6, 1
+    j    done
+
+push:
+    addi s6, s6, 1              # d++
+    slli t0, s6, 1              # t0 = 2d
+    la   t1, tp
+    add  t1, t1, t0
+    lhu  t2, -2(t1)             # tp[d-1]
+    la   t1, st_p
+    add  t1, t1, t0
+    sh   t2, 0(t1)              # st_p[d] = tp[d-1]
+    la   t1, to
+    add  t1, t1, t0
+    lhu  t2, -2(t1)             # to[d-1]
+    la   t1, st_o
+    add  t1, t1, t0
+    sh   t2, 0(t1)              # st_o[d] = to[d-1]
+    la   t1, face
+    add  t1, t1, s6
+    sb   zero, 0(t1)            # face[d] = 0
+    la   t1, turn
+    add  t1, t1, s6
+    sb   zero, 0(t1)            # turn[d] = 0
+    j    loop
+
+next_bound:
+    addi s0, s0, 1          # ++bound
+    j    bound
+fail:
+    li   a0, -1
+
+done:
+    lw   ra, 12(sp)
+    lw   s0, 8(sp)
+    lw   s6, 4(sp)
+    lw   s11, 0(sp)
+    addi sp, sp, 16
+    ret
+ 
 
 heuristic:
     add t2, s2, a1
