@@ -1825,6 +1825,18 @@ move_name:
     .word mv_B, mv_B2, mv_Bp
     .word mv_D, mv_D2, mv_Dp
 
+#s1 perm_trans R face
+#s2 perm_dist
+#s3 orient_trans R face
+#s4 orient_dist
+#s5 move_name
+#s0 bound
+#s6 d
+#s7 perm_trans B face
+#s8 orient_trans B face
+#s9 perm_trans D face
+#s10 orient_trans D face
+
 
     .text
 main:
@@ -1833,12 +1845,34 @@ main:
     la s3, orient_trans
     la s4, orient_dist
 
+    li t0, 10080
+    add s7, s1, t0
+
+    addi s8, s3, 1458
+
+    li t0, 20160
+    add s9, s1, t0
+
+    li t0, 2916
+    add s10, s3, t0
+
+    lhu a0, 0(s9)
+    li a7, 1
+    ecall
+
+    li a0, 10
+    li a7, 11 
+    ecall
+
     la s5, move_name
     lw a0, 4(s5)
 
     li a7, 4
     ecall
 
+    li a0, 10
+    li a7, 11 
+    ecall
 
     li a1, 0
     li a2, 1
@@ -1849,6 +1883,9 @@ main:
     li a7, 1
     ecall
 
+    li a0, 10
+    li a7, 11 
+    ecall
 
     li a7, 10
     ecall 
