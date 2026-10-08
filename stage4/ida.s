@@ -1870,18 +1870,42 @@ main:
     li t0, 2916
     add s10, s3, t0
 
-    li   a1, 720          # p0
-    li   a2, 0            # o0
+    la   s5, move_name         
+    li   a1, 3343                # p0
+    li   a2, 0                  # o0
     jal  ra, ida
 
-    li   a7, 1            
-    ecall
+    mv   s0, a0                 # s0 = len
+    li   s6, 0                  # s6 = i
+print_loop:
+    bge  s6, s0, print_done    
+    la   t0, path_face
+    add  t0, t0, s6
+    lbu  t1, 0(t0)              # t1 = path_face[i]
+    la   t0, path_turn
+    add  t0, t0, s6
+    lbu  t2, 0(t0)              # t2 = path_turn[i]
+    slli t3, t1, 1
+    add  t3, t3, t1             # t3 = (face << 1) + face
+    add  t3, t3, t2             # idx = face * 3 + turn
+    slli t3, t3, 2              # idx * 4
+    add  t3, s5, t3
+    lw a0, 0(t3)                
+    li   a7, 4
+    ecall              
 
-    li   a0, 10           
+    li   a0, 32
     li   a7, 11
-    ecall
+    ecall                   
 
-    li   a7, 10           
+    addi s6, s6, 1              
+    j    print_loop
+print_done:
+    li   a0, 10
+    li   a7, 11
+    ecall                    
+
+    li   a7, 10
     ecall
 
 ida:
@@ -2046,7 +2070,7 @@ push:
     la   t1, turn
     add  t1, t1, s6
     sb   zero, 0(t1)            # turn[d] = 0
-    j    loop
+    j    loop   
 
 next_bound:
     addi s0, s0, 1          # ++bound
